@@ -1,5 +1,15 @@
 \documentclass{article}
 
+\usepackage{geometry, listings}
+\geometry{a4paper, portrait, margin=0.5in}
+
+\lstset{
+  basicstyle=\ttfamily,
+  showstringspaces=false,
+  frame=none,
+  columns=fullflexible
+}
+
 \title{Assignment 4}
 
 \author{Applied Sequence Analysis}
@@ -8,5 +18,84 @@
 \begin{document}
 
 \maketitle
+
+~ work in progress ~
+
+\section{Workflow Design}
+\begin{enumerate}
+    \item Quality Control and Preprocessing
+    \begin{enumerate}
+        \item evaluate quality of sequencing
+        \\ \textbf{FastQC }
+        \item trim reads
+        \\ \textbf{trimmomatic}
+        \item filtering
+        \\ \textit{remove low quality bases from reads}
+        \item Subtract Host DNA
+        \\ \textit{align against human genome and remove reads that map to the host}
+        \\\textbf{Bowtie2}
+    \end{enumerate}
+    \item Decide De Novo or Reference-based assembly
+    \begin{enumerate}
+        \item take a subset of sequences across all strains and map to existing reference
+        \\ \textit{see if  mapping yields a high proportion of unmapped reads, low genome coverage, or lots of false SNPs}
+    \end{enumerate}
+    \item Generate Consensus Sequence
+    \begin{enumerate}
+        \item assemble viral genome 
+        \item generate a consensus sequence 
+        \\ \textit{only for reference-based approach}
+    \end{enumerate}
+    \item Validation 
+    \begin{enumerate}
+        \item Qualimap
+    \end{enumerate}
+     \\deliverable 1: \textit{fasta file with the assembled genome for each sequenced strain}
+     \\deliverable 3: \textit{text file containing the average sequence variability for each window of length x}
+     \\deliverable 4:  \textit{plot showing the variability along the sequenced genome}
+    \item Phylogenetic Tree
+    \begin{enumerate}
+        \item create phylogenetic tree
+    \end{enumerate}
+    \\deliverable 2: \textit{phylogenetic tree in Newick format and visualised in pdf or png format.}
+    
+\end{enumerate}
+\section{Deliverables}
+\begin{itemize}
+    \item fasta file with assembled genome for each sequences strain
+    \item phylogenetic tree in Newick format and visualized in .pdf or .pdg format
+    \item text file containing the average sequence variablility for each window of length x
+    \item plot showing the variability along the sequenced genome
+\end{itemize}
+
+\section{Project Directory Architecture}
+\begin{lstlisting}
+project_home/
+    config/
+        config.yaml
+    results/
+        qc_preprocessing/
+            fastQC/
+            trimmed/
+            filtered/
+        de_novo_vs_reference/
+        raw_assembly/
+            strain1.fasta
+            strain2.fasta
+            etc...
+        validation/
+            qualiMap/
+        phylogenetic_tree/
+            tree.pdf
+        logs/
+    workflow/
+        snakefile
+        envs/
+            rule1.yaml
+            rule2.yaml
+        rules/
+            rule1.smk
+            rule2.smk
+\end{lstlisting}
 
 \end{document}
