@@ -1,0 +1,381 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\documentclass[pdflatex,sn-mathphys-num]{sn-jnl}
+
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{amsthm}
+\usepackage{mathrsfs}
+\usepackage[title]{appendix}
+\usepackage{xcolor}
+\usepackage{textcomp}
+\usepackage{manyfoot}
+\usepackage{booktabs}
+\usepackage{algorithm}
+\usepackage{algorithmicx}
+\usepackage{algpseudocode}
+\usepackage{listings}
+\usepackage{framed}
+\usepackage{tikz}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{url}
+\usetikzlibrary{arrows.meta, positioning}
+\raggedbottom
+
+\begin{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\noindent {\LARGE \bfseries Assignment 4A - Workflow Design: Reproducible Snakemake Workflow for Human Adenovirus Genome Assembly, Phylogenetic Analysis, and Genomic Variability Detection} \\[0.5cm]
+
+\noindent {\large \textbf{Students: Ibraim Ibraimi, Rebecca ... }} \\[0.2cm]
+\noindent {\small Sequence Data Analysis} \\
+\noindent {\small Freie Universität Berlin}
+
+\vspace{0.3cm}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{framed}
+
+\noindent \textbf{Abstract} \\
+
+Human Adenovirus sequencing data provide valuable information about viral evolution, genome diversity, and strain relationships. In this project, we intend to provide a reproducible Snakemake workflow designed for the analysis of Human Adenovirus sequencing datasets. The workflow will integrate quality control, read preprocessing, genome assembly, phylogenetic reconstruction, and genomic variability analysis into a modular and portable bioinformatics pipeline. Existing Snakemake wrappers will be used whenever available in order to improve reproducibility and portability, while Conda environments will be employed for tools without wrappers.
+
+The workflow will generate assembled viral genomes in FASTA format, phylogenetic trees in Newick format together with graphical visualizations, and genomic variability profiles computed using high-resolution per base variability as well as overlapping sliding windows of configurable size. We may choose either de novo or reference-based assembly strategies which are to be discussed and compared with respect to assembly bias, reproducibility, and suitability for downstream phylogenetic inference.
+
+The workflow will be implemented using Snakemake, Conda environments, configuration files, and modular rule definitions to ensure portability across computational environments and reproducible execution on local systems as well as HPC infrastructures.
+
+\end{framed}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Introduction}
+
+Human Adenoviruses are double-stranded DNA viruses associated with respiratory, gastrointestinal, and ocular infections \cite{Lion2014}. Due to their medical relevance and genetic diversity, sequencing-based analysis of Adenovirus genomes is important for epidemiological studies, evolutionary analysis, and outbreak investigation.
+
+Modern sequencing technologies generate large amounts of short-read data that require systematic computational analysis. Such analyses typically involve quality assessment, preprocessing, genome assembly, sequence comparison, phylogenetic reconstruction, and variability analysis. Performing these tasks manually is error-prone and difficult to reproduce. Therefore, workflow management systems such as Snakemake are increasingly used to automate and standardize bioinformatics pipelines \cite{Koster2012}.
+
+The goal of this project is to design and implement a reproducible Snakemake workflow for the analysis of Human Adenovirus sequencing data. The workflow aims to:
+
+\begin{itemize}
+    \item generate assembled viral genomes,
+    \item reconstruct phylogenetic relationships between strains,
+    \item identify regions of high and low genomic variability,
+    \item provide reproducible and portable workflow execution.
+\end{itemize}
+
+In addition to workflow implementation, methodological design choices are discussed, including the comparison between de novo and reference-based assembly strategies and the definition of genomic variability metrics.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Workflow Design}
+
+The workflow will be designed as a modular Snakemake pipeline consisting of independent analysis stages connected through explicitly defined input and output files. This design improves readability, reproducibility, scalability, and maintainability.
+
+Optional workflow switches will allow users to skip selected quality control or pre-processing steps if such analyses were already performed. In addition, the workflow will support partial execution of individual analysis stages. For example, the quality control module may be executed independently prior to running the complete workflow, enabling intermediate inspection of sequencing quality before downstream analyses are performed.
+
+The overall workflow structure is shown conceptually below:
+
+\begin{center}
+\begin{tikzpicture}[
+node distance=1.8cm,
+box/.style={
+rectangle,
+draw=black,
+rounded corners,
+minimum width=3.2cm,
+minimum height=0.9cm,
+align=center
+},
+arrow/.style={-{Latex[length=3mm]}, thick}
+]
+
+\node[box] (reads) {Raw Sequencing Reads};
+\node[box, below=of reads] (qc) {Quality Control\\FastQC + MultiQC};
+\node[box, below=of qc] (trim) {Read Preprocessing\\fastp};
+\node[box, below left=of trim] (denovo) {De Novo Assembly\\SPAdes};
+\node[box, below right=of trim] (mapping) {Reference-Based Mapping\\BWA-MEM2};
+\node[box, below=3cm of trim] (msa) {Multiple Sequence Alignment\\MAFFT};
+\node[box, below=of msa] (tree) {Phylogenetic Reconstruction\\IQ-TREE};
+\node[box, below=of tree] (var) {Variability Analysis\\Sliding Windows};
+
+\draw[arrow] (reads) -- (qc);
+\draw[arrow] (qc) -- (trim);
+\draw[arrow] (trim) -- (denovo);
+\draw[arrow] (trim) -- (mapping);
+\draw[arrow] (denovo) |- (msa);
+\draw[arrow] (mapping) |- (msa);
+\draw[arrow] (msa) -- (tree);
+\draw[arrow] (tree) -- (var);
+
+\end{tikzpicture}
+\end{center}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Quality Control and Read Preprocessing}
+
+Initial quality control will be performed using FastQC in order to assess sequencing quality, adapter contamination, GC content, sequence duplication levels, and per-base quality scores \cite{Andrews2010}. MultiQC will be used to aggregate FastQC reports into a single summary report \cite{Ewels2016}.
+
+As an alternative to Trimmomatic \cite{Bolger2014} used in the previous assignment, the workflow will employ \texttt{fastp} for read preprocessing. Fastp is a modern and efficient preprocessing tool that integrates quality filtering, adapter trimming, quality correction, and quality reporting in a single application \cite{Chen2018}. Compared to Trimmomatic, fastp offers improved execution speed, integrated HTML reporting, and simplified parameter handling.
+
+Lastly we will substract host DNA contanimation in our samples by aligning reads against the host (human) genome and remove any reads that map to the host using Bowtie2. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Genome Assembly Strategy}
+
+A central design decision concerns the choice between de novo assembly and reference-based assembly. In order to assess which strategy to employ we will take a representative subset of sequences across all strains and map to an existing adenovirus reference. If the mapping yields a high proportion of unmapped reads, low genome coverage, or lots of false SNP's, we will move forward with De Novo assembly. Otherwise we will do a reference-based assembly. 
+
+\subsubsection{De Novo Assembly}
+
+De novo assembly reconstructs genomes directly from sequencing reads without relying on a reference genome. In this workflow, SPAdes will be selected as the de novo assembler due to its strong performance on microbial and viral sequencing datasets \cite{Bankevich2012}.
+
+Advantages of de novo assembly include:
+
+\begin{itemize}
+    \item reduced reference bias,
+    \item ability to detect structural variation,
+    \item suitability for divergent or unknown strains.
+\end{itemize}
+
+However, de novo assembly may produce fragmented assemblies in regions of low coverage or repetitive genomic structure.
+
+\subsubsection{Reference-Based Assembly}
+
+Reference-based assembly aligns sequencing reads against an existing reference genome and generates a consensus sequence. In this workflow, BWA-MEM2 \cite{Vasimuddin2019} was selected as a modern alternative to Bowtie2.
+
+Advantages of reference-based assembly include:
+
+\begin{itemize}
+    \item improved assembly continuity,
+    \item computational efficiency,
+    \item robust reconstruction for closely related strains.
+\end{itemize}
+
+A major limitation is reference bias, where genomic regions differing strongly from the reference may be incorrectly reconstructed or missed entirely.
+
+\subsubsection{Assembly Quality Control}
+
+Quality assessment of the assembled viral genomes will be performed in order to evaluate assembly completeness and reliability before downstream phylogenetic and variability analyses are conducted.
+
+For de novo assemblies generated with SPAdes, assembly statistics such as contig number, total assembly length, N50 values, and GC content will be evaluated using QUAST. QUAST provides standardized assembly quality metrics and facilitates comparison between reconstructed genomes \cite{Gurevich2013}.
+
+For reference-based assemblies, mapping statistics and alignment quality metrics will additionally be assessed using samtools and Qualimap2 \cite{Danecek2021,Okonechnikov2016}. These analyses will provide information regarding sequencing depth, genome coverage, mapping quality, and potential low-confidence genomic regions.
+
+Assembly quality control is particularly important because assembly artifacts or incomplete genome reconstruction may influence downstream phylogenetic inference and genomic variability estimation.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Multiple Sequence Alignment}
+
+After assembly, all reconstructed genomes will be combined into a single FASTA file and aligned using MAFFT \cite{Katoh2013}. Multiple sequence alignment is required before phylogenetic reconstruction and genomic variability analysis.
+
+MAFFT was selected because it provides:
+
+\begin{itemize}
+    \item high alignment accuracy,
+    \item efficient execution,
+    \item robust performance for viral genome datasets.
+\end{itemize}
+
+The resulting alignment is stored in FASTA format and used for all downstream comparative analyses.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Phylogenetic Reconstruction}
+
+Phylogenetic relationships between assembled viral genomes will be reconstructed using IQ-TREE. The workflow will generate:
+
+\begin{itemize}
+    \item a phylogenetic tree in Newick format,
+    \item graphical visualization in PDF or PNG format.
+\end{itemize}
+
+Phylogenetic analysis enables identification of closely related strains and provides insight into the evolutionary relationships among sequenced Adenovirus samples.
+
+IQ-TREE \cite{Nguyen2015} will be selected because it supports:
+
+\begin{itemize}
+    \item fast maximum-likelihood tree inference,
+    \item automated model selection,
+    \item statistical branch support estimation.
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Genomic Variability Analysis}
+
+An important objective of the workflow is the identification of genomic regions exhibiting high or low sequence variability.
+
+Two complementary variability approaches will be considered:
+
+\begin{enumerate}
+    \item per-position variability,
+    \item sliding-window variability.
+\end{enumerate}
+
+Per-position variability provides high-resolution information for individual nucleotide positions. However, this approach may produce noisy signals that are difficult to interpret biologically.
+
+Therefore, an overlapping sliding-window strategy will be additionally implemented. For each window of length \(x\), the average variability across all positions within the window will be computed. Consecutive windows overlap in order to obtain smoother and more continuous variability profiles.
+
+The window size is going to be implemented as a configurable workflow parameter in \texttt{config.yaml}, allowing users to adjust the resolution of the analysis.
+
+The workflow will generate:
+
+\begin{itemize}
+    \item a text file containing variability values for all windows,
+    \item a plot showing variability across genomic coordinates.
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Workflow Implementation}
+
+The workflow will be implemented using Snakemake in order to provide reproducible, scalable, and portable execution.
+
+The workflow will be controlled through:
+
+\begin{itemize}
+    \item a central configuration file,
+    \item sample sheets,
+    \item modular rule files including a Snakefile,
+    \item Conda environments.
+\end{itemize}
+
+Existing Snakemake wrappers will be used whenever available. Wrappers improve reproducibility by providing standardized rule definitions and software environment specifications. For tools without available wrappers, Conda environments will be defined manually.
+
+Exact software versions will be specified in Conda environment files in order to guarantee reproducibility across computational systems.
+
+The workflow will be able to support execution on:
+
+\begin{itemize}
+    \item local workstations,
+    \item Linux servers,
+    \item HPC systems.
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Expected Workflow Outputs}
+
+The workflow produces the following deliverables:
+
+\begin{enumerate}
+    \item assembled viral genomes in FASTA format,
+    \item phylogenetic trees in Newick format,
+    \item graphical tree visualizations in PDF or PNG format,
+    \item text files containing average sequence variability values for sliding windows,
+    \item variability plots across genomic coordinates,
+    \item MultiQC reports summarizing quality control results.
+\end{enumerate}
+
+These outputs provide complementary information regarding genome reconstruction quality, evolutionary relationships, and genomic variability.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Discussion}
+
+The designed workflow combines modern bioinformatics tools within a reproducible Snakemake framework for the analysis of Human Adenovirus sequencing data.
+
+One important methodological consideration is choosing an assembly strategy. Reference-based assembly may artificially increase similarity to the reference genome, while de novo assembly may introduce fragmentation or assembly artifacts. Preliminarily mapping to an existing reference helps to see which method is appropriate for the dataset at hand. 
+
+Another important consideration concerns genomic variability analysis. Small sliding windows provide high spatial resolution but may generate noisy signals, whereas large windows produce smoother variability profiles at the expense of local detail. Overlapping windows provide a compromise between these two extremes.
+
+Future extensions of the workflow could include:
+
+\begin{itemize}
+    \item variant calling,
+    \item recombination analysis,
+    \item automated tree annotation,
+    \item support for long-read sequencing technologies.
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Conclusion}
+
+In this project, a reproducible Snakemake workflow will be designed for Human Adenovirus genome analysis. The workflow integrates quality control, preprocessing, genome assembly, phylogenetic reconstruction, and genomic variability analysis into a modular and portable pipeline.
+
+Modern bioinformatics tools including FastQC, fastp, SPAdes, BWA-MEM2, MAFFT, and IQ-TREE were selected in order to provide efficient and reproducible workflow execution. The workflow supports both de novo and reference-based assembly strategies and enables investigation of sequence variability using overlapping sliding-window analysis.
+
+Overall, the workflow provides a flexible and reproducible framework for viral genome analysis and demonstrates how Snakemake can be used to organize complex bioinformatics analyses in a scalable and portable manner.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\backmatter
+
+\begin{thebibliography}{20}
+
+\bibitem{Koster2012}
+Köster, J., and Rahmann, S. (2012).
+Snakemake -- a scalable bioinformatics workflow engine.
+\textit{Bioinformatics}, 28(19), 2520--2522.
+
+\bibitem{Andrews2010}
+Andrews, S. (2010).
+FastQC: A quality control tool for high throughput sequence data.
+
+\bibitem{Ewels2016}
+Ewels, P., Magnusson, M., Lundin, S., and Käller, M. (2016).
+MultiQC: summarize analysis results for multiple tools and samples in a single report.
+\textit{Bioinformatics}, 32(19), 3047--3048.
+
+\bibitem{Chen2018}
+Chen, S., Zhou, Y., Chen, Y., and Gu, J. (2018).
+fastp: an ultra-fast all-in-one FASTQ preprocessor.
+\textit{Bioinformatics}, 34(17), i884--i890.
+
+\bibitem{Bankevich2012}
+Bankevich, A., et al. (2012).
+SPAdes: A New Genome Assembly Algorithm and Its Applications to Single-Cell Sequencing.
+\textit{Journal of Computational Biology}, 19(5), 455--477.
+
+\bibitem{Vasimuddin2019}
+Vasimuddin, M., Misra, S., Li, H., and Aluru, S. (2019).
+Efficient Architecture-Aware Acceleration of BWA-MEM for Multicore Systems.
+\textit{IEEE Parallel and Distributed Processing Symposium}.
+
+\bibitem{Katoh2013}
+Katoh, K., and Standley, D. M. (2013).
+MAFFT multiple sequence alignment software version 7.
+\textit{Molecular Biology and Evolution}, 30(4), 772--780.
+
+\bibitem{Nguyen2015}
+Nguyen, L.-T., Schmidt, H. A., von Haeseler, A., and Minh, B. Q. (2015).
+IQ-TREE: A Fast and Effective Stochastic Algorithm for Estimating Maximum-Likelihood Phylogenies.
+\textit{Molecular Biology and Evolution}, 32(1), 268--274.
+
+\bibitem{Bolger2014}
+Bolger, A. M., Lohse, M., and Usadel, B. (2014).
+Trimmomatic: a flexible trimmer for Illumina sequence data.
+\textit{Bioinformatics}, 30(15), 2114--2120.
+
+\bibitem{Lion2014}
+Lion, T. (2014).
+Adenovirus infections in immunocompetent and immunocompromised patients.
+\textit{Clinical Microbiology Reviews}, 27(3), 441--462.
+
+\bibitem{Gurevich2013}
+Gurevich, A., Saveliev, V., Vyahhi, N., and Tesler, G. (2013).
+QUAST: quality assessment tool for genome assemblies.
+\textit{Bioinformatics}, 29(8), 1072--1075.
+
+\bibitem{Danecek2021}
+Danecek, P., Bonfield, J. K., Liddle, J., et al. (2021).
+Twelve years of SAMtools and BCFtools.
+\textit{GigaScience}, 10(2), giab008.
+
+\bibitem{Okonechnikov2016}
+Okonechnikov, K., Conesa, A., and García-Alcalde, F. (2016).
+Qualimap 2: advanced multi-sample quality control for high-throughput sequencing data.
+\textit{Bioinformatics}, 32(2), 292--294.
+
+\bibitem{Robinson1981}
+Robinson, D. F., and Foulds, L. R. (1981).
+Comparison of phylogenetic trees.
+\textit{Mathematical Biosciences}, 53(1--2), 131--147.
+
+\end{thebibliography}
+
+\end{document}
