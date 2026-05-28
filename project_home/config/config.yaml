@@ -1,0 +1,8 @@
+read_dir: "results/"
+ref: "resources/reference.fa"
+samples: "resources/samples.tsv"
+
+#BWA-MEM2 parameters
+bwamem2:
+  algtype: "bwtsw" #algorithm to use to create FMindex (default: 'bwtsw' aka Burrows-Wheeler transformation)
+
