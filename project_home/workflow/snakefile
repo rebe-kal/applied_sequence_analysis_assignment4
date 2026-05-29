@@ -13,17 +13,19 @@ SAMPLES = samples_df["sample"].tolist()
 fq1_dict = dict(zip(samples_df["sample"], samples_df["fq1"]))
 fq2_dict = dict(zip(samples_df["sample"], samples_df["fq2"]))
 
-print(f"SAMPLES:{SAMPLES}")
-
-print("Sample fq1 dictionary keys:", list(fq1_dict.keys()))
-print("Sample ERR024604:", fq1_dict.get("ERR024604", "MISSING"))
-
-include: "rules/bowtie.smk"
+include: "rules/bwamem2.smk"
 include: "rules/samtools.smk"
 include: "rules/qc.smk"
 
 rule all:
     input:
+        #preprocessing
+        "results/quality_control/aggregated/quality_control_aggregated.html" 
+
+        #map reads to reference
         expand("results/stats/{sample}.txt", sample=SAMPLES),
         expand("results/filtered/{sample}_filtered.bam", sample=SAMPLES),
-        "results/quality_control/aggregated/quality_control_aggregated.html"
+        expand("results/quality_control/qualimapStats/{sample}_qualimap_stats", sample=SAMPLES)
+        
+        #consensus workflow
+        
