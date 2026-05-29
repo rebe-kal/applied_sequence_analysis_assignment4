@@ -29,7 +29,7 @@ rule rawFastQC_R2:
 rule processReads:
     input:
         fq1 = lambda wc: fq1_dict[wc.sample],
-        fq2 = lambda wc: fq2_dict[wc.sample],
+        fq2 = lambda wc: fq2_dict[wc.sample]
     output:
         out1="results/trimmed/{sample}_1_trimmed.fastq.gz",
         out2="results/trimmed/{sample}_2_trimmed.fastq.gz",
@@ -41,7 +41,6 @@ rule processReads:
         "results/logs/fastp/{sample}.log"
     threads: 4
     shell:
-
         """
         fastp \
         -i {input.fq1} -I {input.fq2} \
@@ -112,10 +111,6 @@ rule aggregateQC:
         ),
         expand(
             "results/quality_control/trimmed/{sample}_2_trimmed_fastqc.zip",
-            sample=SAMPLES
-        ),
-        expand(
-            "results/quality_control/qualimapStats/{sample}_qualimap_stats", 
             sample=SAMPLES
         )
     output: 
