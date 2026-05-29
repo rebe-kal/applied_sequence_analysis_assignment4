@@ -1,5 +1,5 @@
 read_dir: "results/"
-ref: "resources/reference.fa"
+ref: "resources/GCA_019453945.1_ASM1945394v1_genomic.fna"
 samples: "resources/samples.tsv"
 
 #BWA-MEM2 parameters
