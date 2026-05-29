@@ -13,26 +13,26 @@ rule constructFMindex:
         "../envs/bwamem2_env.yaml"
     threads: 4
     log:
-        "results/logs/bwamem2/bwamem2_FMindex.log"
+        "results/logs/FMindex/bwamem2_FMindex.log"
     params:
         algtype = config["bwamem2"]["algtype"]
     shell:
         "bwa index -p {input} -a {params.algtype}"
 
-rule alignReads:
+rule mapReads:
     input:
-        rules.constructFMindex.output
-        ref = ref
-        fq1 = "results/trimmed/{sample}_1_trimmed.fastq", 
-        fq2 = "results/trimmed/{sample}_2_trimmed.fastq",  
+        rules.constructFMindex.output,
+        ref = ref,
+        fq1 = "results/trimmed/{sample}_1_trimmed.fastq.gz", 
+        fq2 = "results/trimmed/{sample}_2_trimmed.fastq.gz",  
     output:
-        bam = "results/aligned/{sample}.bam",
-        bai = "results/aligned/{sample}.bam.bai"
+        bam = "results/mapped/{sample}.bam",
+        bai = "results/mapped/{sample}.bam.bai"
     conda:
         "../envs/bwamem2_env.yaml"
     threads: 4 
     log: 
-        "results/logs/bwamem2/{sample}_align.log"
+        "results/logs/mapping/{sample}_mapped.log"
     shell:
         """
         bwa-mem2 mem \
